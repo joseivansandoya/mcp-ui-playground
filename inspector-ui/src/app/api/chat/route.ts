@@ -54,14 +54,22 @@ console.log('>>> tools', tools);
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
+  const stopOnMCPUITool = ({ steps }: { steps: any[] }) => {
+    const last = steps[steps.length - 1];
+    // Either inspect toolCalls or toolResults; both are available per step.
+    const calls = last?.toolCalls ?? [];
+    const results = last?.toolResults ?? [];
+    const isUiCall =
+      calls.some((c: any) => c.toolName?.startsWith('mcpUiTool-')) ||
+      results.some((r: any) => r.toolName?.startsWith('mcpUiTool-'));
+    return Boolean(isUiCall);
+  };
+
   const result = streamText({
     model: openai('gpt-4o'),
     messages: convertToModelMessages(messages),
-    stopWhen: stepCountIs(5),
     tools,
-    // onFinish: async () => {
-    //   await mcpClient.close();
-    // },
+    stopWhen: [stepCountIs(5), stopOnMCPUITool],
   });
 
   return result.toUIMessageStreamResponse();
